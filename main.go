@@ -1,7 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"golevel/hello"
+)
 
 func main() {
-	fmt.Println("Hello Goleveldb")
+	fmt.Println(hello.Greet())
 }

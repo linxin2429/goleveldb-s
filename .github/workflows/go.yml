@@ -1,77 +1,58 @@
-name: Run Tests
-
+name: Build and Test
 on:
   push:
     branches:
       - main
   pull_request:
-    branches:
-      - main
-
-permissions:
-  contents: read
 
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Setup go
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '^1.18'
-      - name: Checkout repository
+          go-version: '1.20'
+
+      - name: Check out code
         uses: actions/checkout@v4
-      - name: Setup golangci-lint
-        uses: golangci/golangci-lint-action@v3.7.0
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.52.2
-          args: --verbose
+          version: v1.53
+          args: --timeout 3m --config .golangci.yml
+
   test:
-    needs: lint
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        go: ['1.18', '1.19', '1.20']
-        test-tags: ['', '-tags nomsgpack', '-tags "sonic avx"', '-tags go_json']
-        include:
-          - os: ubuntu-latest
-            go-build: ~/.cache/go-build
-          - os: macos-latest
-            go-build: ~/Library/Caches/go-build
-    name: ${{ matrix.os }} @ Go ${{ matrix.go }} ${{ matrix.test-tags }}
-    runs-on: ${{ matrix.os }}
-    env:
-      GO111MODULE: on
-      TESTTAGS: ${{ matrix.test-tags }}
-      GOPROXY: https://proxy.golang.org
+    name: Test
+    runs-on: ubuntu-latest
     steps:
-      - name: Set up Go ${{ matrix.go }}
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go }}
-
-      - name: Checkout Code
+          go-version: '1.20'
+      - name: Check out code
         uses: actions/checkout@v4
+
+      - run: go test -v -coverprofile=profile.cov ./...
+
+      - uses: shogo82148/actions-goveralls@v1
         with:
-          ref: ${{ github.ref }}
+          path-to-profile: profile.cov
 
-      - uses: actions/cache@v3
+  build:
+    name: Build
+    runs-on: ubuntu-latest 
+    needs: [lint, test]
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          path: |
-            ${{ matrix.go-build }}
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Run Tests
-        run: make test
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          flags: ${{ matrix.os }},go-${{ matrix.go }},${{ matrix.test-tags }}
-
-      - name: Format
-        if: ${{ matrix.go }} == '1.20.x'
-        run: diff -u <(echo -n) <(gofmt -d .)
+          go-version: '1.20'
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: go get .
+      - name: Build
+        run: go build -v ./...
