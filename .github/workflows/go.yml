@@ -37,6 +37,8 @@ jobs:
 
       - run: go test -v -coverprofile=profile.cov ./...
 
+      - run: go vet ./...
+
       - uses: shogo82148/actions-goveralls@v1
         with:
           path-to-profile: profile.cov
